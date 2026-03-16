@@ -113,6 +113,12 @@ export default function DashboardPage() {
               >
                 📚 Problem Library
               </button>
+              <button
+                onClick={() => router.push('/demo')}
+                style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: '#ef4444', padding: '11px 20px', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', fontFamily: 'Inter,sans-serif', fontWeight: 600 }}
+              >
+                ⚡ TLE Demo
+              </button>
             </div>
           </div>
           <p style={{fontSize:'13px',color:'#555',marginBottom:'24px'}}>Choose your learning mode</p>

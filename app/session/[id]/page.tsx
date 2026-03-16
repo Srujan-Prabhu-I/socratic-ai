@@ -24,6 +24,9 @@ export default function SessionPage() {
   const [loading, setLoading] = useState(false)
   const [questionCount, setQuestionCount] = useState(0)
   const [initializing, setInitializing] = useState(true)
+  const [timeLeft, setTimeLeft] = useState(45 * 60) // 45 minutes
+  const [timerActive, setTimerActive] = useState(false)
+  const [timerStarted, setTimerStarted] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
   const params = useParams()
@@ -39,6 +42,33 @@ export default function SessionPage() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
+
+  useEffect(() => {
+    if (session?.mode !== 'interview') return
+    setTimerActive(true)
+    setTimerStarted(true)
+  }, [session])
+
+  useEffect(() => {
+    if (!timerActive || session?.mode !== 'interview') return
+    const interval = setInterval(() => {
+      setTimeLeft(prev => {
+        if (prev <= 0) {
+          clearInterval(interval)
+          setTimerActive(false)
+          return 0
+        }
+        return prev - 1
+      })
+    }, 1000)
+    return () => clearInterval(interval)
+  }, [timerActive, session])
+
+  const formatTime = (seconds: number) => {
+    const m = Math.floor(seconds / 60)
+    const s = seconds % 60
+    return `${m}:${s.toString().padStart(2, '0')}` 
+  }
 
   const loadSession = async (id: string) => {
     const { data } = await supabase.from('sessions').select('*').eq('id', id).single()
@@ -229,7 +259,22 @@ export default function SessionPage() {
   {/* Center — session title + mode */}
   <div style={{textAlign:'center'}}>
     <div style={{fontSize:'13px',color:'#e5e5e5',fontWeight:500}}>{session?.problem_title || session?.topic}</div>
-    <div style={{fontSize:'11px',color:'#444',marginTop:'2px'}}>Exchange {Math.min(questionCount,10)} · {MODE_LABELS[session?.mode]}</div>
+    <div style={{fontSize:'11px',color:'#444',marginTop:'2px',display:'flex',alignItems:'center',gap:'8px',justifyContent:'center'}}>
+      <span>Exchange {Math.min(questionCount,10)} · {MODE_LABELS[session?.mode]}</span>
+      {session?.mode === 'interview' && (
+        <span style={{
+          color: timeLeft < 300 ? '#ef4444' : timeLeft < 600 ? '#f59e0b' : '#34d399',
+          fontWeight: 600,
+          fontSize: '12px',
+          background: timeLeft < 300 ? 'rgba(239,68,68,0.1)' : 'rgba(52,211,153,0.1)',
+          padding: '2px 8px',
+          borderRadius: '100px',
+          border: `1px solid ${timeLeft < 300 ? 'rgba(239,68,68,0.2)' : 'rgba(52,211,153,0.2)'}`,
+        }}>
+          ⏱ {formatTime(timeLeft)}
+        </span>
+      )}
+    </div>
   </div>
 
   {/* Right — progress dots + change mode */}
@@ -313,13 +358,37 @@ export default function SessionPage() {
             I give up — teach me
           </button>
           {questionCount > 5 && (
-            <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:'12px',marginTop:'12px'}}>
-              <button
-                onClick={() => router.push(`/certificate/${sessionId}`)}
-                style={{background:'#fff',color:'#000',border:'none',padding:'10px 24px',borderRadius:'8px',fontSize:'13px',fontWeight:700,cursor:'pointer',fontFamily:'Inter,sans-serif'}}
-              >
-                🏆 Get Certificate
-              </button>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:'12px',padding:'8px 24px 12px'}}>
+              {session?.mode === 'interview' ? (
+                <button
+                  onClick={() => router.push(`/interview-report/${sessionId}`)}
+                  style={{background:'#fff',color:'#000',border:'none',padding:'10px 24px',borderRadius:'8px',fontSize:'13px',fontWeight:700,cursor:'pointer',fontFamily:'Inter,sans-serif'}}
+                >
+                  🎤 Get Interview Report Card
+                </button>
+              ) : session?.mode === 'review' ? (
+                <div style={{display:'flex',gap:'12px'}}>
+                  <button
+                    onClick={() => router.push(`/complexity/${sessionId}`)}
+                    style={{background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',color:'#fff',padding:'10px 20px',borderRadius:'8px',fontSize:'13px',fontWeight:600,cursor:'pointer',fontFamily:'Inter,sans-serif'}}
+                  >
+                    📊 Analyze Complexity
+                  </button>
+                  <button
+                    onClick={() => router.push(`/certificate/${sessionId}`)}
+                    style={{background:'#fff',color:'#000',border:'none',padding:'10px 24px',borderRadius:'8px',fontSize:'13px',fontWeight:700,cursor:'pointer',fontFamily:'Inter,sans-serif'}}
+                  >
+                    🏆 Get Certificate
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => router.push(`/certificate/${sessionId}`)}
+                  style={{background:'#fff',color:'#000',border:'none',padding:'10px 24px',borderRadius:'8px',fontSize:'13px',fontWeight:700,cursor:'pointer',fontFamily:'Inter,sans-serif'}}
+                >
+                  🏆 Get Certificate
+                </button>
+              )}
               <button
                 onClick={() => router.push('/dashboard')}
                 style={{background:'transparent',border:'1px solid rgba(255,255,255,0.1)',color:'#666',padding:'10px 20px',borderRadius:'8px',fontSize:'13px',cursor:'pointer',fontFamily:'Inter,sans-serif'}}

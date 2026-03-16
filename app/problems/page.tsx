@@ -4,6 +4,13 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 
 const PROBLEMS = [
+  { 
+    id: 0, 
+    title: 'Fix TLE: Find Duplicate in Array', 
+    difficulty: 'Medium', 
+    topic: 'Arrays', 
+    description: 'Your solution works but gets Time Limit Exceeded on large inputs. Given an array of n+1 integers where each integer is between 1 and n, find the duplicate number. Your current O(n²) nested loop solution is too slow. The AI will guide you to optimize it to O(n) in under 5 questions.' 
+  },
   { id: 1, title: 'Two Sum', difficulty: 'Easy', topic: 'Arrays', description: 'Given an array of integers nums and an integer target, return indices of the two numbers such that they add up to target.' },
   { id: 2, title: 'Valid Parentheses', difficulty: 'Easy', topic: 'Stacks', description: 'Given a string s containing just the characters (, ), {, }, [ and ], determine if the input string is valid.' },
   { id: 3, title: 'Reverse Linked List', difficulty: 'Easy', topic: 'Linked Lists', description: 'Given the head of a singly linked list, reverse the list, and return the reversed list.' },

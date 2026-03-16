@@ -278,6 +278,12 @@ export default function LandingPage() {
                 e.currentTarget.style.borderColor='rgba(255,255,255,0.12)';
               }}
             >Dashboard →</button>
+            <button
+              onClick={() => router.push('/demo')}
+              style={{ background: 'transparent', border: '1px solid rgba(239,68,68,0.3)', color: '#ef4444', padding: '11px 28px', borderRadius: '8px', fontSize: '14px', cursor: 'pointer', fontFamily: 'Inter,sans-serif' }}
+            >
+              ⚡ Live Demo
+            </button>
           </div>
 
           {/* Icon Cards with Static Labels */}
