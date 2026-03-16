@@ -390,6 +390,12 @@ export default function SessionPage() {
                 </button>
               )}
               <button
+                onClick={() => router.push(`/variants/${sessionId}`)}
+                style={{background:'rgba(255,255,255,0.04)',border:'1px solid rgba(255,255,255,0.08)',color:'#888',padding:'10px 20px',borderRadius:'8px',fontSize:'13px',cursor:'pointer',fontFamily:'Inter,sans-serif'}}
+              >
+                🧩 Similar Problems
+              </button>
+              <button
                 onClick={() => router.push('/dashboard')}
                 style={{background:'transparent',border:'1px solid rgba(255,255,255,0.1)',color:'#666',padding:'10px 20px',borderRadius:'8px',fontSize:'13px',cursor:'pointer',fontFamily:'Inter,sans-serif'}}
               >
