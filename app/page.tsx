@@ -38,6 +38,8 @@ function InfinityLogo({ size = 'hero' }: { size?: 'hero' | 'nav' }) {
     let t1: any, t2: any, t3: any, iv: any, t4: any, t5: any
 
     function run() {
+      if (!arc || !textEl || !cursor || !d1 || !d2) return
+
       arc.style.transition = 'none'
       arc.setAttribute('stroke-dashoffset', '89')
       textEl.textContent = ''
