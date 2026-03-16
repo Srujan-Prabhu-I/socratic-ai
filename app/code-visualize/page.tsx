@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import SortVisualizer from '@/components/SortVisualizer'
@@ -31,7 +31,7 @@ function detectAlgorithm(code: string) {
   return 'unknown'
 }
 
-export default function CodeVisualizePage() {
+function CodeVisualizerContent() {
   const searchParams = useSearchParams()
   const passedCode = searchParams.get("code")
 
@@ -197,5 +197,22 @@ export default function CodeVisualizePage() {
         {algorithm === 'binary' && <BinarySearchVisualizer />}
       </div>
     </div>
+  )
+}
+
+export default function Page() {
+  return (
+    <Suspense fallback={<div style={{
+      minHeight: '100vh',
+      background: '#080808',
+      color: '#fff',
+      fontFamily: 'Inter, sans-serif',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      fontSize: '18px'
+    }}>Loading visualizer...</div>}>
+      <CodeVisualizerContent />
+    </Suspense>
   )
 }
