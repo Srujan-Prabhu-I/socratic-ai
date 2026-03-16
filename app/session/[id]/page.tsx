@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter, useParams } from 'next/navigation'
+import { useVoiceInterview } from '@/components/useVoiceInterview'
 
 const MODE_LABELS: Record<string, string> = {
   ask: 'Ask & Learn',
@@ -27,10 +28,23 @@ export default function SessionPage() {
   const [timeLeft, setTimeLeft] = useState(45 * 60) // 45 minutes
   const [timerActive, setTimerActive] = useState(false)
   const [timerStarted, setTimerStarted] = useState(false)
+  const [runOutput, setRunOutput] = useState('')
+  const [runError, setRunError] = useState(false)
+  const [runLoading, setRunLoading] = useState(false)
+  const [showRunner, setShowRunner] = useState(false)
+  const [runTime, setRunTime] = useState<number | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
   const params = useParams()
   const sessionId = params.id as string
+
+  const {
+    transcript,
+    listening,
+    startListening,
+    stopListening,
+    speak
+  } = useVoiceInterview()
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session: auth } }) => {
@@ -63,6 +77,19 @@ export default function SessionPage() {
     }, 1000)
     return () => clearInterval(interval)
   }, [timerActive, session])
+
+  useEffect(() => {
+    if (transcript) {
+      setInput(transcript)
+    }
+  }, [transcript])
+
+  useEffect(() => {
+    const lastMessage = messages[messages.length - 1]
+    if (lastMessage?.role === 'assistant' && session?.mode === 'interview') {
+      speak(lastMessage.content)
+    }
+  }, [messages, session?.mode])
 
   const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60)
@@ -227,6 +254,47 @@ export default function SessionPage() {
 
   const modeColor = MODE_COLORS[session?.mode] || '#fff'
 
+  const executeCode = async () => {
+    if (!session?.original_code) return
+    setRunLoading(true)
+    setRunOutput("Running...")
+    try {
+      const logs: string[] = []
+
+      const originalLog = console.log
+
+      console.log = (...args: any[]) => {
+        logs.push(args.join(" "))
+        originalLog(...args)
+      }
+
+      try {
+        eval(session.original_code)
+      } catch (error: any) {
+        setRunOutput(error.toString())
+        setRunError(true)
+        console.log = originalLog
+        return
+      }
+
+      console.log = originalLog
+
+      if (logs.length > 0) {
+        setRunOutput(logs.join("\n"))
+        setRunError(false)
+      } else {
+        setRunOutput("Program executed successfully with no output.")
+        setRunError(false)
+      }
+
+    } catch (e: any) {
+      setRunOutput("Execution failed")
+      setRunError(true)
+    } finally {
+      setRunLoading(false)
+    }
+  }
+
   return (
     <div style={{minHeight:'100vh',background:'#000',fontFamily:'Inter,sans-serif',color:'#fff',display:'flex',flexDirection:'column'}}>
       {/* Nav */}
@@ -287,6 +355,14 @@ export default function SessionPage() {
         <div style={{width:'6px',height:'6px',borderRadius:'50%',background:'rgba(255,255,255,0.3)', animation:'pulse 2s infinite'}}/>
       )}
     </div>
+    {session?.mode === 'review' && (
+      <button
+        onClick={() => setShowRunner(!showRunner)}
+        style={{background:'rgba(52,211,153,0.08)',border:'1px solid rgba(52,211,153,0.15)',color:'#34d399',padding:'5px 12px',borderRadius:'6px',fontSize:'11px',fontWeight:600,cursor:'pointer',fontFamily:'Inter,sans-serif'}}
+      >
+        ▶ Run Code
+      </button>
+    )}
     <button
       onClick={() => router.push('/dashboard')}
       style={{background:'rgba(255,255,255,0.04)',border:'1px solid rgba(255,255,255,0.08)',color:'#888',padding:'6px 14px',borderRadius:'7px',fontSize:'12px',cursor:'pointer',fontFamily:'Inter,sans-serif',whiteSpace:'nowrap' as const}}>
@@ -294,6 +370,43 @@ export default function SessionPage() {
     </button>
   </div>
 </nav>
+
+{showRunner && session?.mode === 'review' && (
+  <div style={{background:'rgba(0,0,0,0.6)',backdropFilter:'blur(20px)',borderBottom:'1px solid rgba(255,255,255,0.07)',padding:'16px 32px',marginTop:'60px'}}>
+    <div style={{maxWidth:'720px',margin:'0 auto'}}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'10px'}}>
+        <span style={{fontSize:'11px',color:'#444',letterSpacing:'1px',textTransform:'uppercase' as const}}>Code Execution — {session.language}</span>
+        <div style={{display:'flex',alignItems:'center',gap:'10px'}}>
+          {runTime !== null && (
+            <span style={{fontSize:'11px',color:'#555'}}>⏱ {runTime}ms</span>
+          )}
+          <button
+            onClick={executeCode}
+            disabled={runLoading}
+            style={{background:'rgba(52,211,153,0.1)',border:'1px solid rgba(52,211,153,0.2)',color:'#34d399',padding:'6px 16px',borderRadius:'7px',fontSize:'12px',fontWeight:600,cursor:'pointer',fontFamily:'Inter,sans-serif'}}
+          >
+            {runLoading ? '⏳ Running...' : '▶ Run'}
+          </button>
+        </div>
+      </div>
+      <pre style={{
+        background:'rgba(0,0,0,0.5)',
+        border:`1px solid ${runError?'rgba(239,68,68,0.2)':'rgba(255,255,255,0.06)'}`,
+        borderRadius:'8px',
+        padding:'12px 14px',
+        fontSize:'12px',
+        color:runError?'#f87171':'#34d399',
+        minHeight:'60px',
+        fontFamily:'monospace',
+        lineHeight:1.6,
+        whiteSpace:'pre-wrap' as const,
+        margin:0
+      }}>
+        {runOutput || '// Output will appear here'}
+      </pre>
+    </div>
+  </div>
+)}
 
       {/* Messages */}
       <div style={{flex:1,overflowY:'auto',padding:'80px 0 120px',maxWidth:'720px',margin:'0 auto',width:'100%'}}>
@@ -340,6 +453,46 @@ export default function SessionPage() {
               style={{flex:1,background:'rgba(255,255,255,0.04)',border:'1px solid rgba(255,255,255,0.08)',borderRadius:'10px',padding:'12px 16px',color:'#fff',fontSize:'14px',resize:'none',fontFamily:'Inter,sans-serif',outline:'none',lineHeight:1.6}}
               disabled={loading}
             />
+            {session?.mode === 'interview' && (
+              <>
+                <button
+                  onClick={listening ? stopListening : startListening}
+                  disabled={loading}
+                  style={{
+                    background: listening ? '#ef4444' : '#22c55e',
+                    border: 'none',
+                    padding: '12px 16px',
+                    borderRadius: '10px',
+                    fontSize: '13px',
+                    fontWeight: 500,
+                    cursor: loading ? 'not-allowed' : 'pointer',
+                    fontFamily: 'Inter,sans-serif',
+                    opacity: loading ? 0.3 : 1,
+                    whiteSpace: 'nowrap',
+                    color: '#fff'
+                  }}
+                >
+                  🎤 {listening ? 'Listening...' : 'Voice Answer'}
+                </button>
+                <button
+                  onClick={() => window.speechSynthesis.cancel()}
+                  style={{
+                    background: '#ef4444',
+                    border: 'none',
+                    padding: '12px 16px',
+                    borderRadius: '10px',
+                    fontSize: '13px',
+                    fontWeight: 500,
+                    cursor: 'pointer',
+                    fontFamily: 'Inter,sans-serif',
+                    whiteSpace: 'nowrap',
+                    color: '#fff'
+                  }}
+                >
+                  Stop Voice
+                </button>
+              </>
+            )}
             <button
               onClick={sendMessage}
               disabled={loading||!input.trim()}
@@ -348,6 +501,12 @@ export default function SessionPage() {
               Send →
             </button>
           </div>
+          {listening && (
+            <div style={{color: '#22c55e', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '8px'}}>
+              <span style={{width: '8px', height: '8px', borderRadius: '50%', background: '#22c55e', animation: 'pulse 1s infinite'}}></span>
+              Listening... Speak your answer
+            </div>
+          )}
           <button
             onClick={handleTeachMe}
             disabled={loading}

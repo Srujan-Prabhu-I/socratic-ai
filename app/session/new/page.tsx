@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabase'
 import { useRouter, useSearchParams } from 'next/navigation'
 import dynamic from 'next/dynamic'
 
-const MonacoEditor = dynamic(() => import('@monaco-editor/react'), { ssr: false })
+const Editor = dynamic(() => import('@monaco-editor/react'), { ssr: false })
 
 const TOPICS = ['Arrays','Linked Lists','Stacks & Queues','Trees','Graphs','Dynamic Programming','Sorting','Binary Search','Recursion','Hashing','Heaps','Tries','Sliding Window','Two Pointers','Backtracking']
 const LANGUAGES = ['javascript','typescript','python','java','cpp','c']
@@ -20,9 +20,14 @@ function SessionNewContent() {
 
   const [question, setQuestion] = useState('')
   const [problemTitle, setProblemTitle] = useState('')
-  const [code, setCode] = useState('// Paste your code here\n')
+  const [editorCode, setEditorCode] = useState(
+`console.log("Hello from SocraticAI")
+console.log("Run Code Working")`
+)
   const [language, setLanguage] = useState('javascript')
   const [selectedTopic, setSelectedTopic] = useState('')
+  const [output, setOutput] = useState('')
+  const [isRunning, setIsRunning] = useState(false)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -30,6 +35,43 @@ function SessionNewContent() {
       else setUser(session.user)
     })
   }, [])
+
+  const runCode = async () => {
+  try {
+    setIsRunning(true)
+
+    const logs: string[] = []
+
+    const originalLog = console.log
+
+    console.log = (...args: any[]) => {
+      logs.push(args.join(" "))
+      originalLog(...args)
+    }
+
+    try {
+      eval(editorCode)
+    } catch (error: any) {
+      setOutput(error.toString())
+      console.log = originalLog
+      setIsRunning(false)
+      return
+    }
+
+    console.log = originalLog
+
+    if (logs.length > 0) {
+      setOutput(logs.join("\n"))
+    } else {
+      setOutput("Program executed successfully with no output.")
+    }
+
+  } catch (error: any) {
+    setOutput("Execution failed")
+  }
+
+  setIsRunning(false)
+}
 
   const handleSubmit = async () => {
     if (!user) return
@@ -48,9 +90,9 @@ function SessionNewContent() {
         insertData.problem_title = question
         insertData.problem_description = question
       } else if (mode === 'review') {
-        if (!problemTitle.trim() || !code.trim()) { setError('Please fill all fields'); setLoading(false); return }
+        if (!problemTitle.trim() || !editorCode.trim()) { setError('Please fill all fields'); setLoading(false); return }
         insertData.problem_title = problemTitle
-        insertData.original_code = code
+        insertData.original_code = editorCode
       } else if (mode === 'learn') {
         if (!selectedTopic) { setError('Please select a topic'); setLoading(false); return }
         insertData.problem_title = selectedTopic
@@ -143,7 +185,30 @@ function SessionNewContent() {
                 </select>
               </div>
               <div style={{ borderRadius: '10px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.08)' }}>
-                <MonacoEditor height="280px" language={language} value={code} onChange={v => setCode(v || '')} theme="vs-dark" options={{ minimap: { enabled: false }, fontSize: 13, lineNumbers: 'on', scrollBeyondLastLine: false, automaticLayout: true, padding: { top: 12 } }} />
+                <Editor
+height="300px"
+language="javascript"
+theme="vs-dark"
+value={editorCode}
+onChange={(value) => setEditorCode(value || "")}
+/>
+              </div>
+              <div style={{marginTop:'12px'}}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'8px'}}>
+                  <label style={{fontSize:'11px',color:'#444',letterSpacing:'1px',textTransform:'uppercase' as const}}>Output</label>
+                  <button
+                    onClick={runCode}
+                    disabled={isRunning}
+                    style={{background: isRunning ? 'rgba(255,255,255,0.05)' : '#10b981', border: 'none', color: '#000', padding: '8px 16px', borderRadius: '8px', fontSize: '14px', fontWeight: 600, cursor: 'pointer', fontFamily: 'Inter,sans-serif', opacity: isRunning ? 0.5 : 1}}
+                  >
+                    {isRunning ? 'Running...' : '▶ Run Code'}
+                  </button>
+                </div>
+                {output && (
+                  <div style={{marginTop:'8px', background:'#000', border:'1px solid rgba(239,68,68,0.3)', borderRadius:'8px', padding:'12px', fontFamily:'monospace', fontSize:'12px', color:'#4ade80', whiteSpace:'pre-wrap', lineHeight:1.5}}>
+                    {output}
+                  </div>
+                )}
               </div>
             </div>
           </div>
