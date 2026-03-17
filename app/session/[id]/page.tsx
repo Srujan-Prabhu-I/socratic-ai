@@ -356,30 +356,49 @@ export default function SessionPage() {
   }
 
   const executeCode = async () => {
-    if (!session?.original_code) return
-    setRunLoading(true)
-    setRunOutput('Running...')
-    setRunError(false)
-    try {
-      const res = await fetch('/api/execute', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          code: session.original_code,
-          language: session.language || 'javascript',
-        }),
-      })
-      const data = await res.json()
-      setRunOutput(data.output)
-      setRunError(data.isError)
-      setRunTime(data.timeMs)
-    } catch (e: any) {
-      setRunOutput('Execution failed: ' + e.message)
-      setRunError(true)
-    } finally {
-      setRunLoading(false)
-    }
+  if (!session?.original_code) {
+    setRunOutput('No code found for this session.')
+    setRunError(true)
+    setShowRunner(true)
+    return
   }
+  setRunLoading(true)
+  setRunOutput('Running...')
+  setRunError(false)
+  setShowRunner(true)
+
+  try {
+    const logs: string[] = []
+    const customConsole = {
+      log: (...args: any[]) => logs.push(args.map((a: any) => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ')),
+      error: (...args: any[]) => logs.push('ERROR: ' + args.join(' ')),
+      warn: (...args: any[]) => logs.push('WARN: ' + args.join(' ')),
+    }
+
+    try {
+      const fn = new Function('console', session.original_code)
+      fn(customConsole)
+    } catch (e: any) {
+      setRunOutput(`Runtime Error: ${e.message}`)
+      setRunError(true)
+      setRunLoading(false)
+      return
+    }
+
+    if (logs.length > 0) {
+      setRunOutput(logs.join('\n'))
+      setRunError(false)
+    } else {
+      setRunOutput('✓ Code executed successfully.\nNo console.log output found.\nAdd console.log() to see output.')
+      setRunError(false)
+    }
+  } catch (e: any) {
+    setRunOutput('Execution failed: ' + e.message)
+    setRunError(true)
+  } finally {
+    setRunLoading(false)
+  }
+}
 
   if (initializing) return (
     <div style={{ minHeight: '100vh', background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Inter,sans-serif' }}>
