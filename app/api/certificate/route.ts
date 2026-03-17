@@ -4,7 +4,7 @@ const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions'
 
 export async function POST(req: NextRequest) {
   try {
-    const { problemTitle, mode, messages, questionCount, language } = await req.json()
+    const { problemTitle, mode, messages, questionCount, language, difficulty } = await req.json()
 
     const conversation = messages.map((m: any) => 
       `${m.role === 'assistant' ? 'AI' : 'Student'}: ${m.content}` 
@@ -15,19 +15,20 @@ export async function POST(req: NextRequest) {
 PROBLEM/TOPIC: ${problemTitle}
 MODE: ${mode}
 LANGUAGE: ${language || 'N/A'}
+DIFFICULTY: ${difficulty || 'intermediate'}
 QUESTIONS USED: ${questionCount} of 5
 
 CONVERSATION:
 ${conversation}
 
-SCORING RULES:
-- Student used ${questionCount} questions out of 5
-- Fewer questions = better understanding = higher score
-- If questionCount <= 2: score should be 90-100, grade A or A+
-- If questionCount <= 3: score should be 75-89, grade B+ or A-  
-- If questionCount <= 4: score should be 60-74, grade B or B-
-- If questionCount === 5: score should be 50-59, grade C+ or C
-- Calculate score and grade based on this
+SCORING RULES — base score on QUALITY OF ANSWERS, not just question count:
+- Read each student response carefully
+- If student gave CORRECT, INSIGHTFUL answers → score 85-100 regardless of questions used
+- If student gave MOSTLY CORRECT answers with minor gaps → score 70-84
+- If student needed lots of hints and guidance → score 55-69
+- If student struggled significantly → score 40-54
+- Questions used is a MINOR factor — a student who answered all 5 correctly deserves 90%+
+- A student who gave up early deserves lower score
 
 Generate a JSON certificate with exactly this structure (no markdown, pure JSON):
 {
@@ -35,9 +36,9 @@ Generate a JSON certificate with exactly this structure (no markdown, pure JSON)
   "reasoningpath": ["step1 of their thinking", "step2", "step3"],
   "strengths": ["strength1", "strength2"],
   "improvement": "one specific area to improve",
-  "score": [dynamic score based on questionCount],
-  "grade": [dynamic grade based on questionCount],
-  "summary": "2 sentence summary of what of student demonstrated"
+  "score": 85,
+  "grade": "A",
+  "summary": "2 sentence summary focusing on WHAT the student demonstrated, not how many questions it took"
 }`
 
     const response = await fetch(GROQ_API_URL, {
