@@ -28,6 +28,8 @@ console.log("Run Code Working")`
   const [selectedTopic, setSelectedTopic] = useState('')
   const [output, setOutput] = useState('')
   const [isRunning, setIsRunning] = useState(false)
+  const [outputError, setOutputError] = useState(false)
+  const [timeMs, setTimeMs] = useState<number | null>(null)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -37,40 +39,27 @@ console.log("Run Code Working")`
   }, [])
 
   const runCode = async () => {
+  if (!editorCode.trim()) return
+  setIsRunning(true)
+  setOutput('')
+  setTimeMs(null)
   try {
-    setIsRunning(true)
-
-    const logs: string[] = []
-
-    const originalLog = console.log
-
-    console.log = (...args: any[]) => {
-      logs.push(args.join(" "))
-      originalLog(...args)
-    }
-
-    try {
-      eval(editorCode)
-    } catch (error: any) {
-      setOutput(error.toString())
-      console.log = originalLog
-      setIsRunning(false)
-      return
-    }
-
-    console.log = originalLog
-
-    if (logs.length > 0) {
-      setOutput(logs.join("\n"))
-    } else {
-      setOutput("Program executed successfully with no output.")
-    }
-
-  } catch (error: any) {
-    setOutput("Execution failed")
+    const res = await fetch('/api/execute', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code: editorCode, language }),
+    })
+    const data = await res.json()
+    if (data.error) throw new Error(data.error)
+    setOutput(data.output)
+    setOutputError(data.isError)
+    setTimeMs(data.timeMs)
+  } catch (e: any) {
+    setOutput(e.message)
+    setOutputError(true)
+  } finally {
+    setIsRunning(false)
   }
-
-  setIsRunning(false)
 }
 
   const handleSubmit = async () => {

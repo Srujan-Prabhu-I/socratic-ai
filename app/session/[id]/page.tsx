@@ -30,6 +30,7 @@ export default function SessionPage() {
   const [runOutput, setRunOutput] = useState('')
   const [runError, setRunError] = useState(false)
   const [runLoading, setRunLoading] = useState(false)
+  const [runTime, setRunTime] = useState<number | null>(null)
   const [showRunner, setShowRunner] = useState(false)
   const [sessionComplete, setSessionComplete] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -248,31 +249,123 @@ export default function SessionPage() {
     finally { setLoading(false) }
   }
 
-  const renderContent = (content: string) => content.split('```').map((part, i) =>
-    i % 2 === 1
-      ? <div key={i} style={{ position: 'relative', margin: '8px 0' }}>
-          <div style={{ fontSize: '10px', color: '#555', letterSpacing: '1px', textTransform: 'uppercase' as const, marginBottom: '4px' }}>code</div>
-          <pre style={{ background: '#000000', border: '1px solid #2c2c2e', borderRadius: '10px', padding: '12px 16px', margin: '0', overflowX: 'auto', fontSize: '13px', color: '#fff', fontFamily: "'SF Mono', monospace", lineHeight: 1.6 }}>{part.replace(/^[a-z]+\n/, '')}</pre>
-        </div>
-      : <span key={i}>{part}</span>
-  )
+  const renderContent = (content: string) => {
+    const parts = content.split('```')
+    
+    return parts.map((part, i) => {
+      if (i % 2 === 1) {
+        const lines = part.split('\n')
+        const lang = lines[0]
+        const code = lines.slice(1).join('\n')
+        return (
+          <div key={i} style={{ position: 'relative', margin: '12px 0' }}>
+            <div style={{ fontSize: '10px', color: '#555', letterSpacing: '1px', textTransform: 'uppercase' as const, marginBottom: '4px' }}>
+              <span>{lang || 'code'}</span>
+            </div>
+            <pre style={{ background: '#000', border: '1px solid #2c2c2e', borderRadius: '10px', padding: '12px 16px', margin: '0', overflowX: 'auto', fontSize: '13px', color: '#fff', fontFamily: "'SF Mono', monospace", lineHeight: 1.6 }}>
+              {code || part}
+            </pre>
+          </div>
+        )
+      }
+
+      const tableLines = part.split('\n').filter((l: string) => l.includes('|') && l.trim().startsWith('|'))
+      const hasTable = tableLines.length >= 2
+
+      const nonTableLines = part.split('\n').filter((l: string) => !(l.includes('|') && l.trim().startsWith('|')))
+
+      return (
+        <span key={i}>
+          {nonTableLines.map((line: string, lineIdx: number) => {
+            if (line.startsWith('## ')) return <div key={lineIdx} style={{ fontSize: '16px', fontWeight: 700, color: '#fff', margin: '12px 0 6px', letterSpacing: '-0.3px' }}>{line.replace('## ', '')}</div>
+            if (line.startsWith('# ')) return <div key={lineIdx} style={{ fontSize: '18px', fontWeight: 800, color: '#fff', margin: '12px 0 8px', letterSpacing: '-0.5px' }}>{line.replace('# ', '')}</div>
+            if (line.startsWith('### ')) return <div key={lineIdx} style={{ fontSize: '14px', fontWeight: 700, color: '#e5e5e5', margin: '10px 0 4px' }}>{line.replace('### ', '')}</div>
+
+            if (line.trim().startsWith('- ') || line.trim().startsWith('• ')) {
+              return (
+                <div key={lineIdx} style={{ display: 'flex', gap: '8px', margin: '3px 0', alignItems: 'flex-start' }}>
+                  <span style={{ color: modeColor, marginTop: '2px', flexShrink: 0 }}>•</span>
+                  <span>{line.replace(/^[\s\-•]+/, '')}</span>
+                </div>
+              )
+            }
+
+            if (/^\d+\./.test(line.trim())) {
+              return (
+                <div key={lineIdx} style={{ display: 'flex', gap: '8px', margin: '3px 0', alignItems: 'flex-start' }}>
+                  <span style={{ color: modeColor, fontWeight: 600, flexShrink: 0 }}>{line.match(/^\d+/)?.[0]}.</span>
+                  <span>{line.replace(/^\d+\.\s*/, '')}</span>
+                </div>
+              )
+            }
+
+            if (line.trim() === '') return <div key={lineIdx} style={{ height: '8px' }} />
+
+            const boldProcessed = line.split('**').map((segment: string, si: number) =>
+              si % 2 === 1
+                ? <strong key={si} style={{ color: '#fff', fontWeight: 700 }}>{segment}</strong>
+                : <span key={si}>{segment}</span>
+            )
+
+            return <div key={lineIdx} style={{ lineHeight: 1.7 }}>{boldProcessed}</div>
+          })}
+
+          {hasTable && (() => {
+            const headers = tableLines[0].split('|').filter((c: string) => c.trim()).map((c: string) => c.trim())
+            const rows = tableLines.slice(2).map((row: string) => row.split('|').filter((c: string) => c.trim()).map((c: string) => c.trim()))
+            if (headers.length === 0) return null
+            return (
+              <div style={{ margin: '12px 0', overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                  <thead>
+                    <tr>
+                      {headers.map((h: string, hi: number) => (
+                        <th key={hi} style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.1)', padding: '8px 12px', textAlign: 'left' as const, color: '#e5e5e5', fontWeight: 600, whiteSpace: 'nowrap' as const }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map((row: string[], ri: number) => (
+                      <tr key={ri} style={{ background: ri % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.02)' }}>
+                        {row.map((cell: string, ci: number) => (
+                          <td key={ci} style={{ border: '1px solid rgba(255,255,255,0.07)', padding: '8px 12px', color: '#aaa', verticalAlign: 'top' as const }}>{cell}</td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )
+          })()}
+        </span>
+      )
+    })
+  }
 
   const executeCode = async () => {
     if (!session?.original_code) return
     setRunLoading(true)
     setRunOutput('Running...')
+    setRunError(false)
     try {
-      const logs: string[] = []
-      const originalLog = console.log
-      console.log = (...args: any[]) => { logs.push(args.join(' ')); originalLog(...args) }
-      try { eval(session.original_code) } catch (error: any) {
-        setRunOutput(error.toString()); setRunError(true); console.log = originalLog; return
-      }
-      console.log = originalLog
-      if (logs.length > 0) { setRunOutput(logs.join('\n')); setRunError(false) }
-      else { setRunOutput('Program executed successfully with no output.'); setRunError(false) }
-    } catch (e: any) { setRunOutput('Execution failed'); setRunError(true) }
-    finally { setRunLoading(false) }
+      const res = await fetch('/api/execute', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          code: session.original_code,
+          language: session.language || 'javascript',
+        }),
+      })
+      const data = await res.json()
+      setRunOutput(data.output)
+      setRunError(data.isError)
+      setRunTime(data.timeMs)
+    } catch (e: any) {
+      setRunOutput('Execution failed: ' + e.message)
+      setRunError(true)
+    } finally {
+      setRunLoading(false)
+    }
   }
 
   if (initializing) return (
